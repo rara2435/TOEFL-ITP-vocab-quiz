@@ -815,6 +815,24 @@
     background-color: var(--hint-vocab-pill-text);
     border-radius: 3px;
   }
+/* クラウド同期ステータス表示バッジ */
+  .sync-status-pill {
+    display: inline-block;
+    margin-top: 5px;
+    font-size: 10.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background-color: var(--bg-card-alt);
+    color: var(--text-sub);
+  }
+  .sync-status-pill.synced {
+    background-color: var(--hint-vocab-bg);
+    color: var(--hint-vocab-pill-text);
+  }
+  .sync-status-pill.error {
+    background-color: var(--wrong-bg);
+    color: var(--wrong-text);
+  }
 </style>
 </head>
 <body>
@@ -2382,6 +2400,155 @@ document.getElementById("reportNewSetBtn").addEventListener("click", () => {
 });
 
 startSession(pickFiveQuestions(), false);
+// =========================================================================
+// URLパラメータ (?key=合言葉) 付きの場合のみスプレッドシートへ自動保存・同期
+// =========================================================================
+const GAS_WEBAPP_URL = "https://script.google.com/macros/s/https://script.google.com/macros/s/AKfycbwODhX12w6-voVfF9VE6KpUi0rWuaMgjMyskIE1O-R2DQO5_7p0QlpmSzB_eO_bHyVAaA/exec";
+const SYNC_KEY = new URLSearchParams(window.location.search).get("key");
+const IS_CLOUD_SYNC_ENABLED = Boolean(
+  SYNC_KEY && GAS_WEBAPP_URL && !GAS_WEBAPP_URL.includes("ここにコピーしたURL")
+);
+
+let cloudSyncStatus = IS_CLOUD_SYNC_ENABLED ? "idle" : "off";
+
+function getSyncBadgeHtml() {
+  if (!IS_CLOUD_SYNC_ENABLED) return "";
+  if (cloudSyncStatus === "syncing") {
+    return `<br><span class="sync-status-pill">☁ 同期中...</span>`;
+  }
+  if (cloudSyncStatus === "synced") {
+    return `<br><span class="sync-status-pill synced">☁ スプレッドシート保存済</span>`;
+  }
+  if (cloudSyncStatus === "error") {
+    return `<br><span class="sync-status-pill error">⚠ 同期エラー（端末に保存済）</span>`;
+  }
+  return `<br><span class="sync-status-pill synced">☁ オンライン同期有効</span>`;
+}
+
+function refreshSyncBadges() {
+  if (!IS_CLOUD_SYNC_ENABLED) return;
+  ["cumulativeBadge", "reportOverallAcc"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const baseHtml = el.innerHTML.split('<br><span class="sync-status-pill')[0];
+    el.innerHTML = baseHtml + getSyncBadgeHtml();
+  });
+}
+
+async function pushToCloud(history, sessionLog = null) {
+  if (!IS_CLOUD_SYNC_ENABLED) return;
+  cloudSyncStatus = "syncing";
+  refreshSyncBadges();
+
+  let seenIds = [];
+  try {
+    seenIds = JSON.parse(localStorage.getItem(SEEN_KEY) || "[]");
+  } catch (e) {}
+
+  try {
+    const res = await fetch(GAS_WEBAPP_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        key: SYNC_KEY,
+        history: history,
+        seenIds: seenIds,
+        sessionLog: sessionLog
+      })
+    });
+    const data = await res.json();
+    cloudSyncStatus = (data && data.status === "ok") ? "synced" : "error";
+  } catch (err) {
+    cloudSyncStatus = "error";
+  }
+  refreshSyncBadges();
+}
+
+async function pullFromCloud() {
+  if (!IS_CLOUD_SYNC_ENABLED) return;
+  cloudSyncStatus = "syncing";
+  refreshSyncBadges();
+
+  try {
+    const url = `${GAS_WEBAPP_URL}?key=${encodeURIComponent(SYNC_KEY)}&t=${Date.now()}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data || data.status !== "ok") {
+      cloudSyncStatus = "error";
+      refreshSyncBadges();
+      return;
+    }
+
+    let localHistory = { totalAnswered: 0, totalCorrect: 0, daily: {}, categories: {}, missedWords: [] };
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) localHistory = { ...localHistory, ...JSON.parse(raw) };
+    } catch (e) {}
+
+    const remoteHistory = data.history;
+    if (remoteHistory && typeof remoteHistory.totalAnswered === "number") {
+      if (remoteHistory.totalAnswered > localHistory.totalAnswered) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteHistory));
+        if (Array.isArray(data.seenIds)) {
+          localStorage.setItem(SEEN_KEY, JSON.stringify(data.seenIds));
+        }
+      } else if (localHistory.totalAnswered > remoteHistory.totalAnswered) {
+        await pushToCloud(localHistory, null);
+        return;
+      }
+    } else if (localHistory.totalAnswered > 0) {
+      await pushToCloud(localHistory, null);
+      return;
+    }
+
+    cloudSyncStatus = "synced";
+  } catch (err) {
+    cloudSyncStatus = "error";
+  }
+  refreshSyncBadges();
+}
+
+// 既存の saveSessionHistory をそのまま動かしつつ、直後に自動送信を追加
+const _baseSaveSessionHistory = saveSessionHistory;
+saveSessionHistory = function() {
+  const history = _baseSaveSessionHistory();
+  if (IS_CLOUD_SYNC_ENABLED) {
+    const now = new Date();
+    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const timeStr = `${dateKey} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const validAnswers = userAnswers.filter(Boolean);
+    const correctCount = validAnswers.filter(a => a.isCorrect).length;
+    const missed = validAnswers.filter(a => !a.isCorrect).map(a => a.question.answer);
+
+    pushToCloud(history, {
+      timestamp: timeStr,
+      mode: isReviewMode ? "復習" : "通常",
+      correct: correctCount,
+      total: validAnswers.length,
+      accuracy: validAnswers.length ? Math.round((correctCount / validAnswers.length) * 100) : 0,
+      missedWords: missed.join(", ") || "なし",
+      totalAnswered: history.totalAnswered,
+      totalAccuracy: history.totalAnswered ? Math.round((history.totalCorrect / history.totalAnswered) * 100) : 0
+    });
+  }
+  return history;
+};
+
+const _baseShowResults = showResults;
+showResults = function() {
+  _baseShowResults();
+  refreshSyncBadges();
+};
+
+const _baseShowWeeklyReport = showWeeklyReport;
+showWeeklyReport = function() {
+  _baseShowWeeklyReport();
+  refreshSyncBadges();
+};
+
+// 起動時にURLパラメータがある場合のみクラウドから最新データを同期
+if (IS_CLOUD_SYNC_ENABLED) {
+  pullFromCloud();
+}
 </script>
 </body>
 </html>

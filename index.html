@@ -997,8 +997,7 @@ const WORD_PHONETICS = {
   inherit: "/ɪnˈherɪt/",
   favorable: "/ˈfeɪvərəbl/",
   exhausted: "/ɪɡˈzɔːstɪd/",
-  peculiar: "/pɪˈkjuːliər/",
-  shallow: "/ˈʃæloʊ/",
+  peculiar: "/pɪˈkjuːliər/",  shallow: "/ˈʃæloʊ/",
   impact: "/ˈɪmpækt/",
   excuse: "/ɪkˈskjuːs/",
   shelter: "/ˈʃeltər/",
@@ -1716,50 +1715,49 @@ let userAnswers = [];
 let isAnswered = false;
 let showingHintAfterAnswer = false;
 let isReviewMode = false;
-let sharedTtsAudio = null;
 let speakToken = 0;
-
-function getSharedTtsAudio() {
-  if (!sharedTtsAudio) {
-    sharedTtsAudio = new Audio();
-    sharedTtsAudio.preload = "auto";
-    sharedTtsAudio.setAttribute("playsinline", "");
-  }
-  return sharedTtsAudio;
-}
+let speakCleanupTimer = null;
 
 function preloadVoices() {
-  if ("speechSynthesis" in window) {
+  if (!("speechSynthesis" in window)) return;
+  try {
     window.speechSynthesis.getVoices();
+  } catch (error) {
+    console.warn("音声一覧を取得できませんでした:", error);
   }
 }
 preloadVoices();
-if ("speechSynthesis" in window && window.speechSynthesis.onvoiceschanged !== undefined) {
-  window.speechSynthesis.onvoiceschanged = preloadVoices;
+if ("speechSynthesis" in window) {
+  if (typeof window.speechSynthesis.addEventListener === "function") {
+    window.speechSynthesis.addEventListener("voiceschanged", preloadVoices);
+  } else {
+    window.speechSynthesis.onvoiceschanged = preloadVoices;
+  }
 }
 
 function stopAllSpeech() {
+  // 実行中の読み上げを無効化してから、ブラウザの音声キューを空にする
   speakToken++;
-  if ("speechSynthesis" in window) {
-    try { window.speechSynthesis.cancel(); } catch (e) {}
+  if (speakCleanupTimer) {
+    clearTimeout(speakCleanupTimer);
+    speakCleanupTimer = null;
   }
-  if (sharedTtsAudio) {
+  if ("speechSynthesis" in window) {
     try {
-      sharedTtsAudio.onended = null;
-      sharedTtsAudio.onerror = null;
-      sharedTtsAudio.onplaying = null;
-      sharedTtsAudio.onloadedmetadata = null;
-      sharedTtsAudio.pause();
-      sharedTtsAudio.removeAttribute("src");
-      sharedTtsAudio.load();
-    } catch (e) {}
+      const engine = window.speechSynthesis;
+      // 再生待ち・再生中の場合だけ停止する。待機時のcancel()は一部スマホで
+      // 直後の読み上げを妨げることがあるため、不要な呼び出しを避ける。
+      if (engine.speaking || engine.pending) engine.cancel();
+    } catch (error) {
+      console.warn("音声を停止できませんでした:", error);
+    }
   }
   document.querySelectorAll(".speaking").forEach(el => el.classList.remove("speaking"));
 }
 
 /* 長文を短いフレーズ配列へ分割 */
 function splitIntoSpeakChunks(text) {
-  const cleaned = text.replace(/\s+/g, " ").trim();
+  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
   if (!cleaned) return [];
   const rawParts = cleaned.split(/(?<=[,;:.!?])\s+|\s+(?=\b(?:to|in|on|for|during|before|until|and|with|from|that|which)\b)/i);
   const chunks = [];
@@ -1777,127 +1775,92 @@ function splitIntoSpeakChunks(text) {
   return chunks.length ? chunks : [cleaned];
 }
 
-function playSingleChunkAudio(chunk, token) {
-  return new Promise((resolve) => {
-    if (token !== speakToken) return resolve();
-    const audio = getSharedTtsAudio();
-    const url = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=" + encodeURIComponent(chunk);
-
-    let settled = false;
-    let fallbackTimer = null;
-
-    const cleanup = () => {
-      if (fallbackTimer) {
-        clearTimeout(fallbackTimer);
-        fallbackTimer = null;
-      }
-      audio.onended = null;
-      audio.onerror = null;
-      audio.onplaying = null;
-      audio.onloadedmetadata = null;
-    };
-
-    const done = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve();
-    };
-
-    fallbackTimer = setTimeout(done, 4000);
-
-    audio.onloadedmetadata = () => {
-      if (settled || token !== speakToken) return;
-      if (isFinite(audio.duration) && audio.duration > 0) {
-        clearTimeout(fallbackTimer);
-        fallbackTimer = setTimeout(done, Math.ceil(audio.duration * 1000) + 1500);
-      }
-    };
-
-    audio.onplaying = () => {
-      if (settled || token !== speakToken) return;
-      clearTimeout(fallbackTimer);
-      const durMs = (isFinite(audio.duration) && audio.duration > 0)
-        ? Math.ceil(audio.duration * 1000) + 1500
-        : Math.max(4500, chunk.length * 110);
-      fallbackTimer = setTimeout(done, durMs);
-    };
-
-    audio.onended = done;
-    audio.onerror = done;
-
-    audio.src = url;
-    const p = audio.play();
-    if (p && typeof p.catch === "function") {
-      p.catch(() => done());
-    }
-  });
-}
-
-async function speakChunks(chunks, triggerEl) {
-  stopAllSpeech();
-  const token = ++speakToken;
-  if (triggerEl) triggerEl.classList.add("speaking");
-
-  const validChunks = chunks.map(c => c.trim()).filter(Boolean);
-  if (!validChunks.length) {
-    if (triggerEl) triggerEl.classList.remove("speaking");
+/*
+ * PC・Android・iPhone/iPadで共通のWeb Speech APIを使用する。
+ * 以前の実装はAndroidや長い例文で外部Google TTS音声に切り替えていたが、
+ * 外部音声URLの再生が端末の自動再生制限や通信環境に左右されていた。
+ * クリック操作の中で全チャンクをspeechSynthesisへ登録し、端末標準の英語音声で再生する。
+ */
+function speakChunks(chunks, triggerEl) {
+  const engine = window.speechSynthesis;
+  if (!("speechSynthesis" in window) || typeof window.SpeechSynthesisUtterance !== "function") {
+    alert("このブラウザは音声読み上げに対応していません。最新版のSafariまたはChromeでお試しください。");
     return;
   }
 
-  const isAndroid = /Android/i.test(navigator.userAgent);
-  const voices = ("speechSynthesis" in window) ? window.speechSynthesis.getVoices() : [];
-  const enVoice = voices.find(v => /^en[-_]US/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang));
+  const validChunks = (chunks || [])
+    .map(chunk => String(chunk || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
 
-  if (!isAndroid && enVoice && validChunks.length === 1) {
-    let started = false;
-    const usedFallback = await new Promise((resolve) => {
-      const utter = new SpeechSynthesisUtterance(validChunks[0]);
-      utter.voice = enVoice;
-      utter.lang = "en-US";
-      utter.rate = 0.96;
-      window._activeUtter = utter;
+  if (!validChunks.length) return;
 
-      const timer = setTimeout(() => {
-        if (!started) {
-          try { window.speechSynthesis.cancel(); } catch (e) {}
-          resolve(true);
-        }
-      }, 650);
+  // 分割していたフレーズを1つの英文に戻し、1つの発話として読み上げる。
+  // 複数のUtteranceを連続登録する方式より、スマホでのキュー停止を避けやすい。
+  const textToSpeak = validChunks.join(" ");
 
-      utter.onstart = () => {
-        started = true;
-        clearTimeout(timer);
-      };
-      utter.onend = () => {
-        clearTimeout(timer);
-        resolve(false);
-      };
-      utter.onerror = () => {
-        clearTimeout(timer);
-        resolve(true);
-      };
-      try {
-        window.speechSynthesis.speak(utter);
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(true);
-      }
-    });
+  // 再生中の別音声だけを止める。待機時のcancel()は呼ばない。
+  stopAllSpeech();
+  const token = speakToken;
 
-    if (!usedFallback) {
-      if (token === speakToken && triggerEl) triggerEl.classList.remove("speaking");
-      return;
+  if (triggerEl) triggerEl.classList.add("speaking");
+
+  let voices = [];
+  try {
+    voices = engine.getVoices() || [];
+  } catch (error) {
+    console.warn("音声一覧を取得できませんでした:", error);
+  }
+
+  // en-USを優先。音声一覧がまだ取得できない場合もlang指定で再生する。
+  const englishVoice =
+    voices.find(voice => /^en[-_]US$/i.test(voice.lang)) ||
+    voices.find(voice => /^en/i.test(voice.lang)) ||
+    null;
+
+  let finished = false;
+  const finish = () => {
+    if (finished || token !== speakToken) return;
+    finished = true;
+    if (speakCleanupTimer) {
+      clearTimeout(speakCleanupTimer);
+      speakCleanupTimer = null;
     }
-  }
+    if (triggerEl) triggerEl.classList.remove("speaking");
+  };
 
-  for (let i = 0; i < validChunks.length; i++) {
-    if (token !== speakToken) break;
-    await playSingleChunkAudio(validChunks[i], token);
-  }
+  // onendが返らないブラウザでも、再生中表示が残り続けないようにする
+  speakCleanupTimer = setTimeout(
+    finish,
+    Math.max(30000, textToSpeak.length * 320 + 10000)
+  );
 
-  if (token === speakToken && triggerEl) {
-    triggerEl.classList.remove("speaking");
+  const utterance = new SpeechSynthesisUtterance(textToSpeak);
+  utterance.lang = "en-US";
+  utterance.rate = 0.92;
+  utterance.pitch = 1;
+  utterance.volume = 1;
+  if (englishVoice) utterance.voice = englishVoice;
+  utterance.onend = finish;
+  utterance.onerror = event => {
+    if (event && event.error && !["canceled", "interrupted"].includes(event.error)) {
+      console.warn("音声読み上げエラー:", event.error);
+    }
+    finish();
+  };
+
+  try {
+    // ボタンのクリックイベント内で直接発話を開始する。
+    // iOS Safariなどで一時停止状態が残っている場合だけresumeを試す。
+    try {
+      if (engine.paused) engine.resume();
+    } catch (error) {
+      // resume非対応時もspeak()を続行する
+    }
+    engine.speak(utterance);
+  } catch (error) {
+    console.error("音声を再生できませんでした:", error);
+    finish();
+    alert("音声を再生できませんでした。端末の音量とブラウザの音声設定をご確認ください。");
   }
 }
 
@@ -2033,8 +1996,7 @@ function renderHintOrExplanation() {
         </div>
         <div class="hint-box gram">
           <div class="hint-box-header">
-            <span class="hint-pill">文法</span>
-          </div>
+            <span class="hint-pill">文法</span>          </div>
           <div class="hint-body-text">${q.grammar}</div>
         </div>
       </div>

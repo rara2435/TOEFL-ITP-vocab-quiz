@@ -530,6 +530,20 @@
     flex-shrink: 0;
   }
 
+  .option-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .option-phonetic {
+    color: var(--text-sub);
+    font-size: 13px;
+    font-weight: normal;
+    font-family: sans-serif;
+  }
+
   .opt-speaker-btn.speaking {
     border-color: var(--accent);
     color: var(--accent);
@@ -953,23 +967,98 @@ const els = {
   newSetBtn: document.getElementById('newSetBtn')
 };
 
-// 音声再生機能（iOS/Android/PC対応）
+// 音声再生機能（PC / iOS Safari / Android Chrome）
+let activeUtterance = null;
+let activeSpeechButton = null;
+let availableSpeechVoices = [];
+
+function getSpeechEngine() {
+  return window.speechSynthesis || window.webkitSpeechSynthesis || null;
+}
+
+function refreshSpeechVoices() {
+  const engine = getSpeechEngine();
+  if (!engine || typeof engine.getVoices !== 'function') return availableSpeechVoices;
+
+  try {
+    const voices = engine.getVoices();
+    // iOSなどでは起動直後に空配列が返るため、空の場合は前回の一覧を保持する
+    if (voices && voices.length > 0) availableSpeechVoices = voices;
+  } catch (error) {
+    console.warn('音声一覧を取得できませんでした:', error);
+  }
+  return availableSpeechVoices;
+}
+
+// ブラウザが音声一覧を後から読み込む場合に備える
+const speechEngine = getSpeechEngine();
+if (speechEngine) {
+  refreshSpeechVoices();
+  if (typeof speechEngine.addEventListener === 'function') {
+    speechEngine.addEventListener('voiceschanged', refreshSpeechVoices);
+  } else {
+    speechEngine.onvoiceschanged = refreshSpeechVoices;
+  }
+}
+
+function clearSpeakingState(utterance) {
+  // 古い読み上げの終了イベントで、新しいボタンの表示を消さない
+  if (utterance && activeUtterance !== utterance) return;
+  if (activeSpeechButton) activeSpeechButton.classList.remove('speaking');
+  activeSpeechButton = null;
+  activeUtterance = null;
+}
+
 function speakText(text, buttonEl) {
-  if (!window.speechSynthesis) {
-    alert("お使いのブラウザは音声読み上げに対応していません。");
+  const engine = getSpeechEngine();
+  if (!engine || typeof window.SpeechSynthesisUtterance !== 'function') {
+    alert('このブラウザでは音声読み上げを利用できません。SafariまたはChromeの最新版をお試しください。');
     return;
   }
-  window.speechSynthesis.cancel(); // 連続再生時の重複を防ぐ
-  const utterance = new SpeechSynthesisUtterance(text);
+
+  const phrase = String(text || '').trim();
+  if (!phrase) return;
+
+  // 待機中に毎回cancel()すると、一部のスマートフォンで次の音声まで停止するため、
+  // 実際に再生中またはキュー待ちの場合に限ってキャンセルする
+  if (engine.speaking || engine.pending) {
+    engine.cancel();
+  }
+  clearSpeakingState();
+
+  const utterance = new window.SpeechSynthesisUtterance(phrase);
   utterance.lang = 'en-US';
   utterance.rate = 0.9;
-  
-  if (buttonEl) buttonEl.classList.add('speaking');
-  utterance.onend = () => {
-    if (buttonEl) buttonEl.classList.remove('speaking');
+  utterance.pitch = 1;
+  utterance.volume = 1;
+
+  // en-US音声を優先し、見つからない場合は他の英語音声を使う
+  const voices = refreshSpeechVoices();
+  const englishVoice =
+    voices.find(voice => /^en-US$/i.test(voice.lang)) ||
+    voices.find(voice => /^en-/i.test(voice.lang));
+  if (englishVoice) utterance.voice = englishVoice;
+
+  activeUtterance = utterance;
+  activeSpeechButton = buttonEl || null;
+  if (activeSpeechButton) activeSpeechButton.classList.add('speaking');
+
+  utterance.onend = () => clearSpeakingState(utterance);
+  utterance.onerror = event => {
+    clearSpeakingState(utterance);
+    if (event.error && event.error !== 'canceled' && event.error !== 'interrupted') {
+      console.warn('音声読み上げエラー:', event.error);
+    }
   };
-  
-  window.speechSynthesis.speak(utterance);
+
+  try {
+    // スマートフォンのユーザー操作制限に対応するため、クリック処理内で直接再生する
+    engine.speak(utterance);
+  } catch (error) {
+    clearSpeakingState(utterance);
+    console.error('音声を再生できませんでした:', error);
+    alert('音声を再生できませんでした。端末の音量とブラウザの設定をご確認ください。');
+  }
 }
 
 function initQuiz() {
@@ -1003,16 +1092,41 @@ function loadQuestion() {
   els.optionsList.innerHTML = '';
   const letters = ['A', 'B', 'C', 'D'];
   q.choices.forEach((choice, index) => {
-    const btn = document.createElement('button');
+    const btn = document.createElement('div');
     btn.className = 'option-btn';
+    btn.setAttribute('role', 'button');
+    btn.setAttribute('tabindex', '0');
+    btn.setAttribute('aria-label', `${letters[index]}、${choice}`);
     btn.innerHTML = `
       <div class="option-left">
         <span class="option-letter">${letters[index]}</span>
         <span class="option-word">${choice}</span>
       </div>
-      <span style="color: var(--text-sub); font-size: 13px; font-weight: normal; font-family: sans-serif;">${q.phonetics[index]}</span>
+      <div class="option-right">
+        <span class="option-phonetic">${q.phonetics[index]}</span>
+        <button type="button" class="opt-speaker-btn" aria-label="${choice}の発音を再生" title="${choice}の発音を再生">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+        </button>
+      </div>
     `;
-    btn.onclick = () => handleSelect(choice, btn, letters[index]);
+
+    const wordSpeaker = btn.querySelector('.opt-speaker-btn');
+    wordSpeaker.addEventListener('click', event => {
+      event.stopPropagation();
+      speakText(choice, wordSpeaker);
+    });
+    btn.addEventListener('click', () => handleSelect(choice, btn, letters[index]));
+    btn.addEventListener('keydown', event => {
+      // 内側の発音ボタンを操作したときは、選択肢の回答処理を発火させない
+      if (event.target !== btn) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        handleSelect(choice, btn, letters[index]);
+      }
+    });
     els.optionsList.appendChild(btn);
   });
 

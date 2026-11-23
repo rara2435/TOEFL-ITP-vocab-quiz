@@ -2403,7 +2403,7 @@ startSession(pickFiveQuestions(), false);
 // =========================================================================
 // URLパラメータ (?key=合言葉) 付きの場合のみスプレッドシートへ自動保存・同期
 // =========================================================================
-const GAS_WEBAPP_URL = "https://script.google.com/macros/s/https://script.google.com/macros/s/AKfycbwODhX12w6-voVfF9VE6KpUi0rWuaMgjMyskIE1O-R2DQO5_7p0QlpmSzB_eO_bHyVAaA/exec";
+const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwODhX12w6-voVfF9VE6KpUi0rWuaMgjMyskIE1O-R2DQO5_7p0QlpmSzB_eO_bHyVAaA/exec";
 const SYNC_KEY = new URLSearchParams(window.location.search).get("key");
 const IS_CLOUD_SYNC_ENABLED = Boolean(
   SYNC_KEY && GAS_WEBAPP_URL && !GAS_WEBAPP_URL.includes("ここにコピーしたURL")

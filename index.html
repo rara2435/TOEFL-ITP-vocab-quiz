@@ -1,866 +1,210 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>TOEFL ITP 基礎単語クイズ</title>
-<style>
-  :root {
-    --bg-main: #131314;
-    --bg-card: #1E1F20;
-    --bg-card-alt: #282A2C;
-    --text-main: #E3E3E3;
-    --text-sub: #9AA0A6;
-    --accent: #A8C7FA;
-    --accent-dim: rgba(168, 199, 250, 0.14);
-    --bar-inactive: #2C2E33;
-    --border-subtle: #2C2E33;
-
-    /* 3色ヒントコンテナ（確定版配色・高コントラスト） */
-    --hint-struct-bg: #192231;
-    --hint-struct-border: #25344D;
-    --hint-struct-pill-bg: #263854;
-    --hint-struct-pill-text: #A8C7FA;
-
-    --hint-vocab-bg: #17241E;
-    --hint-vocab-border: #243D32;
-    --hint-vocab-pill-bg: #223D30;
-    --hint-vocab-pill-text: #81C995;
-    --hint-vocab-chip-bg: #20352B;
-    --hint-vocab-chip-border: #315243;
-    --hint-vocab-chip-sub: #B7DEC3;
-
-    --hint-gram-bg: #262116;
-    --hint-gram-border: #3B321F;
-    --hint-gram-pill-bg: #42361E;
-    --hint-gram-pill-text: #FDD663;
-
-    /* 正誤カラー */
-    --correct-bg: #182921;
-    --correct-border: #81C995;
-    --correct-text: #81C995;
-    --wrong-bg: #2B1A1A;
-    --wrong-border: #F28B82;
-    --wrong-text: #F28B82;
-  }
-
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    -webkit-tap-highlight-color: transparent;
-    box-shadow: none !important;
-    text-shadow: none !important;
-  }
-
-  html, body {
-    width: 100%;
-    height: 100%;
-    background-color: var(--bg-main);
-    color: var(--text-main);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
-    overflow: hidden;
-  }
-
-  .app-shell {
-    width: 100%;
-    max-width: 480px;
-    height: 100dvh;
-    max-height: 100dvh;
-    margin: 0 auto;
-    padding: 62px 18px 16px;
-    display: flex;
-    flex-direction: column;
-    background-color: var(--bg-main);
-    overflow: hidden;
-  }
-
-  /* ヘッダー＆インスタグラムストーリー風5分割プログレスバー */
-  .top-header {
-    width: 100%;
-    flex-shrink: 0;
-  }
-
-  .header-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-  }
-
-  .header-title-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .header-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-main);
-    letter-spacing: 0.02em;
-  }
-
-  .mode-badge {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background-color: var(--hint-gram-pill-bg);
-    color: var(--hint-gram-pill-text);
-  }
-
-  .header-count {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-sub);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .progress-segments {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 5px;
-    width: 100%;
-  }
-
-  .progress-seg {
-    height: 4px;
-    border-radius: 2px;
-    background-color: var(--bar-inactive);
-    transition: background-color 0.2s ease;
-  }
-
-  .progress-seg.active {
-    background-color: var(--accent);
-  }
-
-  .progress-seg.wrong {
-    background-color: var(--wrong-border);
-  }
-
-  /* クイズメインコンテナ */
-  #quizView {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    justify-content: flex-start;
-  }
-
-  /* 問題文エリア */
-  .question-section {
-    margin-top: 22px;
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    flex-shrink: 0;
-  }
-
-  .question-text {
-    font-size: 21px;
-    line-height: 1.48;
-    font-weight: 500;
-    color: var(--text-main);
-    flex: 1;
-    word-break: break-word;
-  }
-
-  .blank-slot {
-    display: inline-block;
-    min-width: 78px;
-    border-bottom: 2px solid var(--accent);
-    color: var(--accent);
-    text-align: center;
-    padding: 0 4px;
-    font-weight: 600;
-    line-height: 1.28;
-  }
-
-  .blank-slot.filled {
-    border-bottom-color: var(--correct-border);
-    color: var(--correct-text);
-  }
-
-  .speaker-btn {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    border: 1px solid var(--border-subtle);
-    background-color: var(--bg-card);
-    color: var(--text-main);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
-  }
-
-  .speaker-btn:active {
-    background-color: var(--bg-card-alt);
-  }
-
-  .speaker-btn.speaking {
-    border-color: var(--accent);
-    color: var(--accent);
-    background-color: var(--accent-dim);
-  }
-
-  /* 3段ヒント＆解説カード */
-  .hint-card {
-    margin-top: 20px;
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 14px;
-    padding: 9px 10px;
-    flex: 1 1 auto;
-    min-height: 195px;
-    max-height: 242px;
-    overflow-y: auto;
-    position: relative;
-    scrollbar-width: thin;
-    scrollbar-color: #3C4043 transparent;
-  }
-
-  .hint-card::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  .hint-card::-webkit-scrollbar-thumb {
-    background-color: #3C4043;
-    border-radius: 4px;
-  }
-
-  .hint-card.interactive {
-    cursor: pointer;
-  }
-
-  .hint-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  .hint-box {
-    border-radius: 9px;
-    padding: 6px 9px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .hint-box.struct {
-    background-color: var(--hint-struct-bg);
-    border: 1px solid var(--hint-struct-border);
-  }
-
-  .hint-box.vocab {
-    background-color: var(--hint-vocab-bg);
-    border: 1px solid var(--hint-vocab-border);
-  }
-
-  .hint-box.gram {
-    background-color: var(--hint-gram-bg);
-    border: 1px solid var(--hint-gram-border);
-  }
-
-  .hint-box-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .hint-pill {
-    display: inline-block;
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 1.5px 8px;
-    border-radius: 999px;
-    letter-spacing: 0.03em;
-  }
-
-  .hint-box.struct .hint-pill {
-    background-color: var(--hint-struct-pill-bg);
-    color: var(--hint-struct-pill-text);
-  }
-
-  .hint-box.vocab .hint-pill {
-    background-color: var(--hint-vocab-pill-bg);
-    color: var(--hint-vocab-pill-text);
-  }
-
-  .hint-box.gram .hint-pill {
-    background-color: var(--hint-gram-pill-bg);
-    color: var(--hint-gram-pill-text);
-  }
-
-  .hint-body-text {
-    font-size: 12px;
-    line-height: 1.44;
-    color: var(--text-main);
-  }
-
-  /* 単語チップ */
-  .chip-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-
-  .word-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11.5px;
-    line-height: 1.28;
-    padding: 3px 7px;
-    border-radius: 7px;
-    background-color: var(--hint-vocab-chip-bg);
-    border: 1px solid var(--hint-vocab-chip-border);
-    color: var(--text-main);
-  }
-
-  .word-chip strong {
-    font-weight: 700;
-    color: #FFFFFF;
-  }
-
-  .word-chip span {
-    color: var(--hint-vocab-chip-sub);
-    font-weight: 500;
-  }
-
-  /* 解説ビュー */
-  .exp-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
-  }
-
-  .exp-badge {
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background-color: var(--accent-dim);
-    color: var(--accent);
-  }
-
-  .toggle-indicator {
-    font-size: 11px;
-    color: var(--accent);
-    font-weight: 500;
-  }
-
-  .exp-translation {
-    font-size: 13px;
-    line-height: 1.45;
-    color: var(--text-main);
-    margin-bottom: 7px;
-    padding-bottom: 7px;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .exp-choices-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .exp-choice-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 12px;
-    padding: 3.5px 8px;
-    border-radius: 7px;
-    background-color: var(--bg-card-alt);
-  }
-
-  .exp-choice-item.is-correct {
-    background-color: var(--correct-bg);
-    border: 1px solid var(--hint-vocab-border);
-  }
-
-  .exp-choice-word {
-    font-weight: 600;
-    color: var(--text-main);
-  }
-
-  .exp-choice-item.is-correct .exp-choice-word {
-    color: var(--correct-text);
-  }
-
-  .exp-choice-meaning {
-    color: var(--text-sub);
-  }
-
-  /* 復習モード専用ぼかしオーバーレイ */
-  .blur-overlay {
-    position: absolute;
-    inset: 0;
-    background-color: rgba(30, 31, 32, 0.88);
-    backdrop-filter: blur(7px);
-    -webkit-backdrop-filter: blur(7px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    border-radius: 13px;
-    cursor: pointer;
-    z-index: 5;
-  }
-
-  .blur-overlay-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--accent);
-    padding: 6px 14px;
-    border-radius: 999px;
-    background-color: var(--accent-dim);
-    border: 1px solid rgba(168, 199, 250, 0.3);
-  }
-
-  .blur-overlay-sub {
-    font-size: 11px;
-    color: var(--text-sub);
-  }
-
-  /* 4択リスト */
-  .options-list {
-    margin-top: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    flex-shrink: 0;
-  }
-
-  .option-btn {
-    width: 100%;
-    min-height: 48px;
-    padding: 9px 14px;
-    flex-shrink: 0;
-    border-radius: 12px;
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    color: var(--text-main);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    text-align: left;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-  }
-
-  .option-btn:active:not(.locked) {
-    background-color: var(--bg-card-alt);
-  }
-
-  .option-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-  }
-
-  .option-letter {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    background-color: var(--bg-card-alt);
-    color: var(--text-sub);
-    font-size: 12px;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .option-word {
-    font-size: 15.5px;
-    font-weight: 500;
-    color: var(--text-main);
-  }
-
-  .option-btn.correct {
-    background-color: var(--correct-bg);
-    border-color: var(--correct-border);
-  }
-
-  .option-btn.correct .option-letter {
-    background-color: var(--correct-border);
-    color: #131314;
-  }
-
-  .option-btn.correct .option-word {
-    color: var(--correct-text);
-    font-weight: 600;
-  }
-
-  .option-btn.wrong {
-    background-color: var(--wrong-bg);
-    border-color: var(--wrong-border);
-  }
-
-  .option-btn.wrong .option-letter {
-    background-color: var(--wrong-border);
-    color: #131314;
-  }
-
-  .option-btn.wrong .option-word {
-    color: var(--wrong-text);
-  }
-
-  .opt-speaker-btn {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: 1px solid var(--border-subtle);
-    background-color: var(--bg-card-alt);
-    color: var(--text-sub);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-
-  .opt-speaker-btn.speaking {
-    border-color: var(--accent);
-    color: var(--accent);
-    background-color: var(--accent-dim);
-  }
-
-  /* 下部ボタン */
-  .bottom-action {
-    margin-top: 20px;
-    flex-shrink: 0;
-  }
-
-  .next-btn {
-    width: 100%;
-    height: 46px;
-    border-radius: 23px;
-    border: 1px solid var(--border-subtle);
-    background-color: var(--bg-card);
-    color: var(--text-sub);
-    font-size: 14.5px;
-    font-weight: 600;
-    cursor: not-allowed;
-    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-  }
-
-  .next-btn.ready {
-    background-color: var(--accent);
-    border-color: var(--accent);
-    color: #131314;
-    cursor: pointer;
-  }
-
-  /* 結果画面＆1週間レポート画面 */
-  .screen-hidden {
-    display: none !important;
-  }
-
-  .result-container {
-    margin-top: 22px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding-bottom: 12px;
-  }
-
-  .score-card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 16px;
-    padding: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-  }
-
-  .score-main-label {
-    font-size: 12px;
-    color: var(--text-sub);
-    margin-bottom: 4px;
-  }
-
-  .score-value {
-    font-size: 30px;
-    font-weight: 700;
-    color: var(--accent);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .score-value span {
-    font-size: 15px;
-    color: var(--text-sub);
-    font-weight: 500;
-  }
-
-  .score-total-badge {
-    text-align: right;
-    font-size: 12px;
-    color: var(--text-sub);
-    line-height: 1.5;
-  }
-
-  .score-total-badge strong {
-    color: var(--text-main);
-    font-size: 14px;
-  }
-
-  .action-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .primary-action-btn {
-    width: 100%;
-    height: 46px;
-    border-radius: 12px;
-    border: none;
-    background-color: var(--accent);
-    color: #131314;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .secondary-action-btn {
-    width: 100%;
-    height: 44px;
-    border-radius: 12px;
-    border: 1px solid var(--border-subtle);
-    background-color: var(--bg-card);
-    color: var(--text-main);
-    font-size: 13.5px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .secondary-action-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .review-list-card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 14px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .section-sub-title {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--text-sub);
-    letter-spacing: 0.03em;
-  }
-
-  .summary-item {
-    padding: 9px 10px;
-    border-radius: 10px;
-    background-color: var(--bg-card-alt);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .summary-item-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .summary-word-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .status-dot {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 6px;
-  }
-
-  .status-dot.ok {
-    background-color: var(--correct-bg);
-    color: var(--correct-text);
-  }
-
-  .status-dot.ng {
-    background-color: var(--wrong-bg);
-    color: var(--wrong-text);
-  }
-
-  .summary-word {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-main);
-  }
-
-  .summary-ja {
-    font-size: 12px;
-    color: var(--text-sub);
-    line-height: 1.45;
-  }
-
-  /* 1週間レポートグラフ */
-  .chart-bars {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 6px;
-    align-items: end;
-    height: 110px;
-    padding-top: 14px;
-  }
-
-  .chart-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    height: 100%;
-    justify-content: flex-end;
-  }
-
-  .chart-pct {
-    font-size: 10px;
-    color: var(--text-sub);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .chart-bar-track {
-    width: 100%;
-    max-width: 24px;
-    height: 64px;
-    background-color: var(--bg-card-alt);
-    border-radius: 6px;
-    display: flex;
-    align-items: flex-end;
-    overflow: hidden;
-  }
-
-  .chart-bar-fill {
-    width: 100%;
-    background-color: var(--accent);
-    border-radius: 6px;
-    transition: height 0.25s ease;
-  }
-
-  .chart-date {
-    font-size: 10px;
-    color: var(--text-sub);
-  }
-
-  .cat-row {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-top: 6px;
-  }
-
-  .cat-row-top {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: var(--text-main);
-  }
-
-  .cat-track {
-    width: 100%;
-    height: 6px;
-    background-color: var(--bg-card-alt);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .cat-fill {
-    height: 100%;
-    background-color: var(--hint-vocab-pill-text);
-    border-radius: 3px;
-  }
-</style>
-</head>
-<body>
-<div class="app-shell">
-  <header class="top-header">
-    <div class="header-row">
-      <div class="header-title-wrap">
-        <span class="header-title" id="headerTitle">TOEFL ITP 基礎単語</span>
-        <span class="mode-badge screen-hidden" id="reviewBadge">復習モード</span>
+<script>
+const QUESTION_BANK = [
+  {
+    id: 1, category: "動詞", answer: "require",
+    before: "All living organisms", after: "water and essential nutrients to survive.",
+    choices: ["require", "provide", "decline", "hesitate"],
+    translation: "すべての生物は、生き残るために水と不可欠な栄養素を必要とする。"
+  },
+  {
+    id: 2, category: "形容詞", answer: "significant",
+    before: "Sunlight plays a", after: "role in the process of photosynthesis.",
+    choices: ["significant", "reluctant", "temporary", "fragile"],
+    translation: "太陽光は光合成の過程において重要な役割を果たしている。"
+  },
+  {
+    id: 3, category: "動詞", answer: "maintain",
+    before: "Warm-blooded animals can", after: "a constant body temperature even in cold weather.",
+    choices: ["maintain", "abandon", "interrupt", "consume"],
+    translation: "恒温動物は寒い天候の中でも一定の体温を維持することができる。"
+  },
+  {
+    id: 4, category: "名詞", answer: "evidence",
+    before: "Scientists found clear", after: "of ancient water on the surface of Mars.",
+    choices: ["evidence", "interval", "obstacle", "attitude"],
+    translation: "科学者たちは火星の表面に古代の水の明確な証拠を発見した。"
+  },
+  {
+    id: 5, category: "副詞", answer: "currently",
+    before: "The software update is", after: "unavailable due to server maintenance.",
+    choices: ["currently", "barely", "formerly", "mutually"],
+    translation: "サーバーメンテナンスのため、現在ソフトウェアのアップデートは利用できません。"
+  }
+];
+
+let currentIndex = 0;
+let score = 0;
+let isAnswered = false;
+
+// DOM要素の取得
+const els = {
+  quizView: document.getElementById('quizView'),
+  resultView: document.getElementById('resultView'),
+  questionText: document.getElementById('questionText'),
+  speakerBtn: document.getElementById('questionSpeakerBtn'),
+  optionsList: document.getElementById('optionsList'),
+  nextBtn: document.getElementById('nextBtn'),
+  hintCardContent: document.getElementById('hintCardContent'),
+  blurOverlay: document.getElementById('blurOverlay'),
+  progressSegments: document.getElementById('progressSegments'),
+  headerCount: document.getElementById('headerCount'),
+  scoreValue: document.getElementById('scoreValue'),
+  newSetBtn: document.getElementById('newSetBtn')
+};
+
+// 音声再生機能（iOS/Android/PC対応）
+function speakText(text, buttonEl) {
+  if (!window.speechSynthesis) {
+    alert("お使いのブラウザは音声読み上げに対応していません。");
+    return;
+  }
+  window.speechSynthesis.cancel(); // 連続再生時の重複を防ぐ
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.9;
+  
+  if (buttonEl) buttonEl.classList.add('speaking');
+  utterance.onend = () => {
+    if (buttonEl) buttonEl.classList.remove('speaking');
+  };
+  
+  window.speechSynthesis.speak(utterance);
+}
+
+function initQuiz() {
+  currentIndex = 0;
+  score = 0;
+  els.quizView.classList.remove('screen-hidden');
+  els.resultView.classList.add('screen-hidden');
+  renderProgress();
+  loadQuestion();
+}
+
+function renderProgress() {
+  els.progressSegments.innerHTML = '';
+  for (let i = 0; i < QUESTION_BANK.length; i++) {
+    const seg = document.createElement('div');
+    seg.className = 'progress-seg';
+    if (i < currentIndex) seg.classList.add('active'); // 完了した問題
+    els.progressSegments.appendChild(seg);
+  }
+}
+
+function loadQuestion() {
+  isAnswered = false;
+  const q = QUESTION_BANK[currentIndex];
+  els.headerCount.textContent = `${currentIndex + 1} / ${QUESTION_BANK.length}`;
+  
+  // 問題文の表示（空欄を作成）
+  els.questionText.innerHTML = `${q.before} <span class="blank-slot">____</span> ${q.after}`;
+  
+  // 選択肢の表示
+  els.optionsList.innerHTML = '';
+  const letters = ['A', 'B', 'C', 'D'];
+  q.choices.forEach((choice, index) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `
+      <div class="option-left">
+        <span class="option-letter">${letters[index]}</span>
+        <span class="option-word">${choice}</span>
       </div>
-      <span class="header-count" id="headerCount">1 / 5</span>
+    `;
+    btn.onclick = () => handleSelect(choice, btn, letters[index]);
+    els.optionsList.appendChild(btn);
+  });
+
+  // ヒントエリアをリセット
+  els.blurOverlay.classList.remove('screen-hidden');
+  els.hintCardContent.innerHTML = '';
+  
+  // ボタンリセット
+  els.nextBtn.disabled = true;
+  els.nextBtn.textContent = '選択肢を選んでください';
+  els.nextBtn.classList.remove('ready');
+  
+  // プログレスバーの現在位置をハイライト
+  els.progressSegments.children[currentIndex].style.backgroundColor = '#A8C7FA';
+}
+
+function handleSelect(selectedChoice, btnEl, letter) {
+  if (isAnswered) return;
+  isAnswered = true;
+  
+  const q = QUESTION_BANK[currentIndex];
+  const isCorrect = (selectedChoice === q.answer);
+  
+  if (isCorrect) score++;
+
+  // 選択肢の正誤ハイライト
+  Array.from(els.optionsList.children).forEach(child => {
+    child.classList.add('locked');
+    const word = child.querySelector('.option-word').textContent;
+    if (word === q.answer) {
+      child.classList.add('correct'); // 正解の選択肢を緑に
+    } else if (word === selectedChoice && !isCorrect) {
+      child.classList.add('wrong'); // 間違えて選んだものを赤に
+    }
+  });
+
+  // 空欄に正解を埋める
+  els.questionText.innerHTML = `${q.before} <span class="blank-slot filled">${q.answer}</span> ${q.after}`;
+  
+  // ヒント・解説の表示
+  els.blurOverlay.classList.add('screen-hidden');
+  els.hintCardContent.innerHTML = `
+    <div class="exp-header">
+      <span class="exp-badge">日本語訳</span>
     </div>
-    <div class="progress-segments" id="progressSegments"></div>
-  </header>
+    <div class="exp-translation">${q.translation}</div>
+  `;
 
-  <main id="quizView">
-    <section class="question-section">
-      <div class="question-text" id="questionText"></div>
-      <button type="button" class="speaker-btn" id="questionSpeakerBtn" aria-label="英文を再生">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-        </svg>
-      </button>
-    </section>
+  // 次へボタンの活性化
+  els.nextBtn.disabled = false;
+  els.nextBtn.textContent = currentIndex === QUESTION_BANK.length - 1 ? '結果を見る' : '次の問題へ';
+  els.nextBtn.classList.add('ready');
 
-    <section class="hint-card" id="hintCard">
-      <div class="blur-overlay screen-hidden" id="blurOverlay">
-        <span class="blur-overlay-label">タップしてヒントを表示</span>
-        <span class="blur-overlay-sub">まずは自力で文脈から考えてみましょう</span>
-      </div>
-      <div id="hintCardContent"></div>
-    </section>
+  // 自動で問題文全体を読み上げる
+  const fullText = `${q.before} ${q.answer} ${q.after}`;
+  speakText(fullText, els.speakerBtn);
+}
 
-    <section class="options-list" id="optionsList"></section>
+// イベントリスナー
+els.speakerBtn.addEventListener('click', () => {
+  const q = QUESTION_BANK[currentIndex];
+  // 解答前は "blank" と読み、解答後は正解を読んでくれる
+  const wordToSpeak = isAnswered ? q.answer : "blank";
+  const fullText = `${q.before} ${wordToSpeak} ${q.after}`;
+  speakText(fullText, els.speakerBtn);
+});
 
-    <div class="bottom-action">
-      <button type="button" class="next-btn" id="nextBtn" disabled>選択肢を選んでください</button>
-    </div>
-  </main>
+els.blurOverlay.addEventListener('click', () => {
+  if (isAnswered) return;
+  els.blurOverlay.classList.add('screen-hidden');
+  els.hintCardContent.innerHTML = `<div class="exp-translation" style="color:#A8C7FA;">※まずは空欄に入る品詞や文脈を推測してみましょう</div>`;
+});
 
-  <section id="resultView" class="result-container screen-hidden">
-    <div class="score-card">
-      <div>
-        <div class="score-main-label" id="resultSubtitle">今回のスコア</div>
-        <div class="score-value" id="scoreValue">0 <span>/ 5 問正解</span></div>
-      </div>
-      <div class="score-total-badge" id="cumulativeBadge"></div>
-    </div>
+els.nextBtn.addEventListener('click', () => {
+  if (!isAnswered) return;
+  
+  if (currentIndex < QUESTION_BANK.length - 1) {
+    currentIndex++;
+    loadQuestion();
+  } else {
+    showResult();
+  }
+});
 
-    <div class="action-group">
-      <button type="button" class="primary-action-btn" id="newSetBtn">新しい5問を解く</button>
-      <button type="button" class="secondary-action-btn" id="retryWrongBtn">間違えた問題だけ解き直す</button>
-      <button type="button" class="secondary-action-btn" id="openReportBtn">1週間レポートを見る</button>
-    </div>
+els.newSetBtn.addEventListener('click', initQuiz);
 
-    <div class="review-list-card">
-      <div class="section-sub-title">今回の出題一覧（タップで発音確認）</div>
-      <div id="sessionSummaryList" style="display:flex;flex-direction:column;gap:6px;"></div>
-    </div>
-  </section>
+function showResult() {
+  els.quizView.classList.add('screen-hidden');
+  els.resultView.classList.remove('screen-hidden');
+  els.scoreValue.innerHTML = `${score} <span>/ ${QUESTION_BANK.length} 問正解</span>`;
+}
 
-  <section id="reportView"
+// アプリ起動
+window.onload = initQuiz;
+</script>
+</body>
+</html>

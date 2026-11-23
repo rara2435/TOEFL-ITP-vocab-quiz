@@ -16,6 +16,7 @@
     --bar-inactive: #2C2E33;
     --border-subtle: #2C2E33;
 
+    /* 3色ヒントコンテナ（確定版配色・高コントラスト） */
     --hint-struct-bg: #192231;
     --hint-struct-border: #25344D;
     --hint-struct-pill-bg: #263854;
@@ -34,6 +35,7 @@
     --hint-gram-pill-bg: #42361E;
     --hint-gram-pill-text: #FDD663;
 
+    /* 正誤カラー */
     --correct-bg: #182921;
     --correct-border: #81C995;
     --correct-text: #81C995;
@@ -54,8 +56,8 @@
   html, body {
     width: 100%;
     height: 100%;
-    background-color: #131314;
-    color: #E3E3E3;
+    background-color: var(--bg-main);
+    color: var(--text-main);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
     overflow: hidden;
   }
@@ -63,7 +65,6 @@
   .app-shell {
     width: 100%;
     max-width: 480px;
-    height: 100vh;
     height: 100dvh;
     max-height: 100dvh;
     margin: 0 auto;
@@ -72,25 +73,9 @@
     flex-direction: column;
     background-color: var(--bg-main);
     overflow: hidden;
-    position: relative;
   }
 
-  .audio-toast {
-    position: fixed;
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: var(--bg-card-alt);
-    border: 1px solid var(--accent);
-    color: var(--text-main);
-    font-size: 12px;
-    padding: 7px 14px;
-    border-radius: 999px;
-    z-index: 100;
-    white-space: nowrap;
-    pointer-events: none;
-  }
-
+  /* ヘッダー＆インスタグラムストーリー風5分割プログレスバー */
   .top-header {
     width: 100%;
     flex-shrink: 0;
@@ -154,6 +139,7 @@
     background-color: var(--wrong-border);
   }
 
+  /* クイズメインコンテナ */
   #quizView {
     display: flex;
     flex-direction: column;
@@ -162,6 +148,7 @@
     justify-content: flex-start;
   }
 
+  /* 問題文エリア */
   .question-section {
     margin-top: 22px;
     display: flex;
@@ -221,6 +208,7 @@
     background-color: var(--accent-dim);
   }
 
+  /* 3段ヒント＆解説カード */
   .hint-card {
     margin-top: 20px;
     background-color: var(--bg-card);
@@ -314,6 +302,7 @@
     color: var(--text-main);
   }
 
+  /* 単語チップ */
   .chip-list {
     display: flex;
     flex-wrap: wrap;
@@ -343,6 +332,7 @@
     font-weight: 500;
   }
 
+  /* 解説ビュー */
   .exp-header {
     display: flex;
     align-items: center;
@@ -408,6 +398,7 @@
     color: var(--text-sub);
   }
 
+  /* 復習モード専用ぼかしオーバーレイ */
   .blur-overlay {
     position: absolute;
     inset: 0;
@@ -439,6 +430,7 @@
     color: var(--text-sub);
   }
 
+  /* 4択リスト */
   .options-list {
     margin-top: 20px;
     display: flex;
@@ -544,6 +536,7 @@
     background-color: var(--accent-dim);
   }
 
+  /* 下部ボタン */
   .bottom-action {
     margin-top: 20px;
     flex-shrink: 0;
@@ -569,6 +562,7 @@
     cursor: pointer;
   }
 
+  /* 結果画面＆1週間レポート画面 */
   .screen-hidden {
     display: none !important;
   }
@@ -631,3 +625,242 @@
     flex-direction: column;
     gap: 8px;
     flex-shrink: 0;
+  }
+
+  .primary-action-btn {
+    width: 100%;
+    height: 46px;
+    border-radius: 12px;
+    border: none;
+    background-color: var(--accent);
+    color: #131314;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .secondary-action-btn {
+    width: 100%;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--border-subtle);
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .secondary-action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .review-list-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .section-sub-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-sub);
+    letter-spacing: 0.03em;
+  }
+
+  .summary-item {
+    padding: 9px 10px;
+    border-radius: 10px;
+    background-color: var(--bg-card-alt);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .summary-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .summary-word-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .status-dot {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 6px;
+  }
+
+  .status-dot.ok {
+    background-color: var(--correct-bg);
+    color: var(--correct-text);
+  }
+
+  .status-dot.ng {
+    background-color: var(--wrong-bg);
+    color: var(--wrong-text);
+  }
+
+  .summary-word {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+  }
+
+  .summary-ja {
+    font-size: 12px;
+    color: var(--text-sub);
+    line-height: 1.45;
+  }
+
+  /* 1週間レポートグラフ */
+  .chart-bars {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    align-items: end;
+    height: 110px;
+    padding-top: 14px;
+  }
+
+  .chart-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    height: 100%;
+    justify-content: flex-end;
+  }
+
+  .chart-pct {
+    font-size: 10px;
+    color: var(--text-sub);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chart-bar-track {
+    width: 100%;
+    max-width: 24px;
+    height: 64px;
+    background-color: var(--bg-card-alt);
+    border-radius: 6px;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+  }
+
+  .chart-bar-fill {
+    width: 100%;
+    background-color: var(--accent);
+    border-radius: 6px;
+    transition: height 0.25s ease;
+  }
+
+  .chart-date {
+    font-size: 10px;
+    color: var(--text-sub);
+  }
+
+  .cat-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .cat-row-top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-main);
+  }
+
+  .cat-track {
+    width: 100%;
+    height: 6px;
+    background-color: var(--bg-card-alt);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .cat-fill {
+    height: 100%;
+    background-color: var(--hint-vocab-pill-text);
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="top-header">
+    <div class="header-row">
+      <div class="header-title-wrap">
+        <span class="header-title" id="headerTitle">TOEFL ITP 基礎単語</span>
+        <span class="mode-badge screen-hidden" id="reviewBadge">復習モード</span>
+      </div>
+      <span class="header-count" id="headerCount">1 / 5</span>
+    </div>
+    <div class="progress-segments" id="progressSegments"></div>
+  </header>
+
+  <main id="quizView">
+    <section class="question-section">
+      <div class="question-text" id="questionText"></div>
+      <button type="button" class="speaker-btn" id="questionSpeakerBtn" aria-label="英文を再生">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+        </svg>
+      </button>
+    </section>
+
+    <section class="hint-card" id="hintCard">
+      <div class="blur-overlay screen-hidden" id="blurOverlay">
+        <span class="blur-overlay-label">タップしてヒントを表示</span>
+        <span class="blur-overlay-sub">まずは自力で文脈から考えてみましょう</span>
+      </div>
+      <div id="hintCardContent"></div>
+    </section>
+
+    <section class="options-list" id="optionsList"></section>
+
+    <div class="bottom-action">
+      <button type="button" class="next-btn" id="nextBtn" disabled>選択肢を選んでください</button>
+    </div>
+  </main>
+
+  <section id="resultView" class="result-container screen-hidden">
+    <div class="score-card">
+      <div>
+        <div class="score-main-label" id="resultSubtitle">今回のスコア</div>
+        <div class="score-value" id="scoreValue">0 <span>/ 5 問正解</span></div>
+      </div>
+      <div class="score-total-badge" id="cumulativeBadge"></div>
+    </div>
+
+    <div class="action-group">
+      <button type="button" class="primary-action-btn" id="newSetBtn">新しい5問を解く</button>
+      <button type="button" class="secondary-action-btn" id="retryWrongBtn">間違えた問題だけ解き直す</button>
+      <button type="button" class="secondary-action-btn" id="openReportBtn">1週間レポートを見る</button>
+    </div>
+
+    <div class="review-list-card">
+      <div class="section-sub-title">今回の出題一覧（タップで発音確認）</div>
+      <div id="sessionSummaryList" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+  </section>
+
+  <section id="reportView"
